@@ -48,6 +48,10 @@ from osdagbridge.core.bridge_components.super_structure.cross_bracing.builder im
     build_cross_bracings
 )
 
+# Substructure (piers, pier caps, pile caps, piles + rebar)
+from osdagbridge.core.bridge_components.sub_structure.layout import SubstructureParams
+from osdagbridge.core.bridge_components.sub_structure.builder import build_substructure
+
 from osdagbridge.core.bridge_types.plate_girder.dto import (
     BridgeParametersDTO,
 )
@@ -60,6 +64,7 @@ KEY_CAD_DECK = "Deck"
 KEY_CAD_CRASH_BARRIER = "Crash Barrier"
 KEY_CAD_RAILING = "Railing"
 KEY_CAD_MEDIAN = "Median"
+KEY_CAD_SUBSTRUCTURE = "Substructure"
 KEY_MODULE_PG = "Plate Girder"
 
 
@@ -137,6 +142,10 @@ class PlateGirderCADGenerator:
         self.display = None
         self.cad_widget = None
         self.component = None
+        # Substructure: override with a SubstructureParams instance to customise
+        self.substructure_params = None
+        self.substructure_layout = None   # filled by generate(); reused by IFC export
+        self.substructure_params_used = None
 
     def _set_parameters(self, design_params: BridgeParametersDTO):
         # MATERIAL GRADES
@@ -908,6 +917,19 @@ class PlateGirderCADGenerator:
         
         supports = supports_tri + supports_cyl
 
+        # STEP 8: SUBSTRUCTURE (pier cap, pier, pile cap, piles + reinforcement)
+        sub_params = (getattr(design_params, "substructure_params", None)
+                      or self.substructure_params or SubstructureParams())
+        self.substructure_params_used = sub_params
+        sub_entries, self.substructure_layout = build_substructure(
+            sub_params,
+            span_length=self.span_length_L,
+            deck_width=deck_out["total_deck_width"],
+            girder_d=self.girder_section_d,
+            tf_b=self.girder_section_tf_b,
+            skew_deg=self.skew_angle,
+        )
+
         # RETURN ALL GENERATED COMPONENTS
         
         return {
@@ -956,7 +978,10 @@ class PlateGirderCADGenerator:
             "median_w_beams": median_w_beams,
             
             # Railings
-            "railings": railings
+            "railings": railings,
+
+            # Substructure (concrete: pier_caps/piers/pile_caps/piles; steel: substructure_rebar)
+            **sub_entries,
         }
 
     def create3Dcad(self):

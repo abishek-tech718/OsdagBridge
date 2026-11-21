@@ -125,7 +125,8 @@ class PlateGirderIFCExtractor:
             "cross_bracings": self._extract_cross_bracings(n_girders, spacing),
             "deck_slab": self._extract_deck_slab(total_width),
             "crash_barriers": self._extract_safety_components(total_width, actual_base_width, actual_railing_width),
-            "supports": self._extract_supports(n_girders, spacing)
+            "supports": self._extract_supports(n_girders, spacing),
+            "substructure": self._extract_substructure(total_width),
         }
 
     def _solve_girder_layout(self, total_width):
@@ -465,6 +466,28 @@ class PlateGirderIFCExtractor:
                 z_base=z_base, y_offset=y_railing_right, skew=self.skew_angle, geo=railing_geo, ifc_name="Footpath Railing R"))
                 
         return components
+
+    def _extract_substructure(self, total_width):
+        """
+        Substructure layout (pier caps, piers, pile caps, piles, rebar).
+
+        Re-uses the layout already built for the CAD window when available so the
+        IFC is guaranteed identical to what the user sees; otherwise rebuilds it
+        from the same parameters (pure Python, no OCC needed).
+        """
+        layout = getattr(self.cad, "substructure_layout", None)
+        if layout is not None:
+            return layout
+        from osdagbridge.core.bridge_components.sub_structure.layout import (
+            SubstructureParams, build_substructure_layout,
+        )
+        params = (getattr(self.cad, "substructure_params_used", None)
+                  or getattr(self.cad, "substructure_params", None)
+                  or SubstructureParams())
+        return build_substructure_layout(
+            params, span_length=self.cad.span_length_L, deck_width=total_width,
+            girder_d=self.cad.girder_section_d, tf_b=self.cad.girder_section_tf_b,
+            skew_deg=self.skew_angle)
 
     def _extract_supports(self, n_girders, spacing):
         supports = []

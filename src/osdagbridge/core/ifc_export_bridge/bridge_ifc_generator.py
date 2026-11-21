@@ -619,6 +619,13 @@ class BridgeIfcGenerator:
                  elif item._class_name == "RailingSweep":
                      _process_railing(item)
                  
+        # Substructure (pier cap, pier, pile cap, piles + reinforcement cages)
+        sub_layout = extracted_dict.get("substructure")
+        if sub_layout is not None:
+            from osdagbridge.core.ifc_export_bridge.substructure_ifc import add_substructure_to_ifc
+            summary = add_substructure_to_ifc(self, sub_layout)
+            print(f"Substructure exported: {summary}")
+
         # Intentionally ignore "deck_textures"
         print("Model assembly complete. Saving...")
         self.file.write(self.output_path)
